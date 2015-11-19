@@ -3,6 +3,7 @@ import re
 import pprint
 import math
 import xml.etree.ElementTree as ET
+from lxml import etree
 
 class Edge:
 	def __init__(self, label, num, toNode):
@@ -20,9 +21,10 @@ class Edge:
 		return self.label
 
 class Node:
-	def __init__(self, label):
+	def __init__(self, label, num):
 		self.edges = []
 		self.label = label
+		self.num = num
 
 	def addEdge(self, label, num, child):
 		self.edges.append(Edge(label, num, child))
@@ -33,29 +35,12 @@ class Node:
 	def getEdges(self):
 		return self.edges
 
-	def hasEdges(self):
-		return True if len(self.edges) > 0 else False
-	
-"""
-class Node:
-	def __init__(self, label):
-		self.edges = {}
-		self.label = label
-
-	def addEdge(self, label, child):
-		self.edges[label] = child
-
-	def getLabel(self):
-		return self.label
-
-	def getEdges(self):
-		return self.edges
-"""
+	def getNum(self):
+		return self.num
 
 class TrainingSet:
 	def __init__(self):
 		self.domain = {}
-		self.sizes = None
 		self.category = None
 		self.attributes = None
 		self.records = []
@@ -68,10 +53,6 @@ class TrainingSet:
 	def addCategory(self, category):
 		""" Add a category """
 		self.category = category
-
-	def addSizes(self, sizes):
-		""" Add numbers """
-		self.sizes = sizes
 
 	def printRecords(self):
 		pprint.pprint(self.records)
@@ -88,10 +69,9 @@ class TrainingSet:
 			domain = self.domain.get(self.attributes[i])
 
 			if not value.isdigit():
-				idx = domain.get('groups').index(value)
-				record[self.attributes[i]] = {'name': domain.get('groups')[idx]}
+				record[self.attributes[i]] = value
 			else:
-				record[self.attributes[i]] = {'name': domain.get('groups')[value - 1]}
+				record[self.attributes[i]] = domain[value - 1]
 
 			i += 1
 
@@ -106,11 +86,9 @@ class TrainingSet:
 			line = re.split(r',', line);
 			if i == 1:
 				self.addAttributes(line[1:])
-			elif i == 2:
-				self.addSizes(line[1:])
 			elif i == 3:
 				self.addCategory(line[0])
-			else:
+			elif i > 3:
 				self.addData(line[1:])
 			i += 1
 
@@ -119,27 +97,17 @@ class TrainingSet:
 		root = ET.parse(domain).getroot()
 
 		for variable in root.findall('variable'):
-			domain = {}
-			domain['groups'] = []
-			domain['ps'] = []
-
-			i = 1
+			domain = []
 			for group in variable.findall('group'):
-				domain['groups'].append(group.get('name'))
-				domain['ps'].append(group.get('p'))
-				i += 1
+				domain.append(group.get('name'))
+
 			self.domain[variable.get('name')] = domain
 
 		category = root.find('Category')
-		cat = {}
-		cat['groups'] = []
-		cat['ps'] = []
-
-		i = 1
+		cat = []
 		for choice in category.findall('choice'):
-			cat['groups'].append(choice.get('name'))
-			cat['ps'].append(choice.get('type'))
-			i += 1
+			cat.append(choice.get('name'))
+
 		self.domain[category.get('name')] = cat
 
 	def getSubset(self, data, attr, value):
@@ -149,7 +117,7 @@ class TrainingSet:
 
 		for record in data:
 			attribute = record.get(attr)
-			if attribute.get('name') == value:
+			if attribute == value:
 				subset.append(record)
 
 		return subset
@@ -162,7 +130,7 @@ class TrainingSet:
 		
 		domain = self.domain.get(attr)
 
-		for group in domain.get('groups'):
+		for group in domain:
 			subset = self.getSubset(data, attr, group)
 
 			e, c = self.getEnthropy(subset)
@@ -179,11 +147,11 @@ class TrainingSet:
 		c = None
 		t = 0
 
-		for choice in category.get('groups'):
+		for choice in category:
 			chosen = 0
 
 			for record in data:
-				if record.get(self.category).get('name') == choice:
+				if record.get(self.category) == choice:
 					chosen += 1
 
 			if numRecords != 0:
@@ -226,20 +194,21 @@ class TrainingSet:
 
 		e, choice = self.getEnthropy(data)
 		node = None
+		num = self.domain.get(self.category).index(choice) + 1
 
 		if e == 0:
-			return Node(choice)
+			return Node(choice, num)
 		elif len(attrs) == 0:
-			return Node(choice)
+			return Node(choice, num)
 		else:
 			split = self.selectSplit(data, attrs, thresh)
 
 			if split is None:
-				return Node(choice)
+				return Node(choice, num)
 			else:
-				node = Node(split)
+				node = Node(split, 0)
 
-				for i, group in enumerate(self.domain.get(split).get('groups')):
+				for i, group in enumerate(self.domain.get(split)):
 					subset = self.getSubset(data, split, group)
 					if len(subset) > 0:
 						newAttrs = attrs[:]
@@ -262,41 +231,38 @@ def printTree(node):
 		print "num: %d" % edge.getNum()
 		printTree(edge.getToNode())
 
-def buildDecision(element, node):
-	decision = ET.Element('decision')
-	decision.choice = node.getLabel()
+def buildDecision(node):
+	decision = etree.Element('decision', choice=node.getLabel(), end=str(node.getNum()))
 
-	element.append(decision)
+	return decision
 
-	return element
+def buildEdge(edge):
+	edge_element = etree.Element('edge', var=edge.getLabel(), num=str(edge.getNum()))
 
-def buildEdge(element, edge):
-	edge_element = ET.Element('edge')
-	edge_element.var = edge.getLabel()
-	edge_element.num = edge.getNum()
+	rest = buildNode(edge.getToNode())
+	edge_element.append(rest)
+	return edge_element
 
-	buildNode(edge_element, edge.getToNode())
 
-def buildNode(element, node):
-	element_node = ET.Element('node')
-	element_node.var = node.getLabel()
+def buildNode(node):
 
-	if node.hasEdges():
+	node_element = etree.Element('node', var=node.getLabel())
+
+	if len(node.getEdges()) > 0:
 		for edge in node.getEdges():
-			buildEdge(node, edge)
+			rest = buildEdge(edge)
+			node_element.append(rest)
 	else:
-		element_node.append(buildDecision(element_node, node))
+		return buildDecision(node)
 
-	element.append(element_node)
-	return element
+	return node_element
 
 def buildXML(node):
-	tree = ET.Element('tree')
+	tree = etree.Element('tree')
 	
-	tree = buildNode(tree, node)
-	t = ET.tostring(tree)
+	tree.append(buildNode(node))
 
-	print t
+	print etree.tostring(tree, pretty_print=True)
 
 
 if __name__ == '__main__':
@@ -314,6 +280,7 @@ if __name__ == '__main__':
 	ts.getTrainingSet(fp)
 	#ts.printRecords()
 	node = ts.applyC45()
+	#printTree(node)
 
 	buildXML(node)
 
