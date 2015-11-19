@@ -119,7 +119,8 @@ class TrainingSet:
 			attribute = record.get(attr)
 			if attribute == value:
 				subset.append(record)
-
+		#print subset
+		#print "*" * 50 
 		return subset
 
 	def getAttrEnthropy(self, data, attr):
@@ -134,7 +135,7 @@ class TrainingSet:
 			subset = self.getSubset(data, attr, group)
 
 			e, c = self.getEnthropy(subset)
-			sum += len(subset)/sizeData * e
+			sum += float((float(len(subset))/float(sizeData)) * e)
 
 		return sum
 
@@ -142,6 +143,7 @@ class TrainingSet:
 		""" get information enthropy """
 
 		numRecords = len(data)
+		#print numRecords
 		category = self.domain.get(self.category)
 		sum = 0
 		c = None
@@ -176,12 +178,14 @@ class TrainingSet:
 		""" selects the best attribute to split the data """
 
 		e0, choice = self.getEnthropy(data)
-		entropies = {}
+		#entropies = {}
 		gain = {}
 
 		for attr in attrs:
-			entropies[attr] = self.getAttrEnthropy(data, attr)
-			gain[attr] = e0 - entropies[attr]
+			#entropies[attr] = self.getAttrEnthropy(data, attr)
+			entropy = self.getAttrEnthropy(data, attr)
+			
+			gain[attr] = e0 - entropy
 
 		best = max(gain, key=lambda x: x[0])
 		if gain[best] > thresh:
@@ -202,7 +206,6 @@ class TrainingSet:
 			return Node(choice, num)
 		else:
 			split = self.selectSplit(data, attrs, thresh)
-
 			if split is None:
 				return Node(choice, num)
 			else:
@@ -222,14 +225,6 @@ class TrainingSet:
 		tree = self.C45(self.records, self.attributes[:len(self.attributes) - 1], 0)
 
 		return tree
-
-def printTree(node):
-	print "node: %s" % node.getLabel()
-
-	for edge in node.getEdges():
-		print "edge: %s" % edge.getLabel()
-		print "num: %d" % edge.getNum()
-		printTree(edge.getToNode())
 
 def buildDecision(node):
 	decision = etree.Element('decision', choice=node.getLabel(), end=str(node.getNum()))
@@ -263,6 +258,9 @@ def buildXML(node):
 	tree.append(buildNode(node))
 
 	print etree.tostring(tree, pretty_print=True)
+
+	xml = ET.ElementTree(tree)
+	xml.write("tree.xml")
 
 
 if __name__ == '__main__':
