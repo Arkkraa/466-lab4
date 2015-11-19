@@ -1,0 +1,80 @@
+
+		"""
+		i = 0
+		for name in data:
+			newNode = {}
+			newEdge = {}
+
+			newNode["var"] = self.names[i]
+
+			if not name.isdigit():
+				newEdge["var"] = name
+
+				for variable in self.domain.findall("variable"):
+					varName = variable.get("name")
+					if varName == self.names[i]:
+						index = 0
+						for group in variable.findall("group"):
+							grpName = group.get("name")
+							if grpName == name:
+								newEdge["num"] = index
+			else:
+				newEdge["num"] = name
+
+				for variable in self.domain.findall("variable"):
+					varName = variable.get("name")
+					if varName == self.names[i]:
+						index = name
+						for group in variable.findall("group"):
+							if index == 0:
+								newEdge["var"] = group.get("name")
+							index -= 1
+			
+			newNode[""]	
+			i += 1
+			#newEdge["num"] = self.domain.find()
+			"""
+
+
+			record = {}
+		i = 0
+
+		for name in data:
+			node = {}
+
+			if not name.isdigit():
+				node["name"] = name
+
+				for variable in self.domain.findall("variable"):
+					if variable.get("name") == self.names[i]:
+						index = 1
+						for group in variable.findall("group"):
+							if group.get("name") == name:
+								node["num"] = index
+							index += 1
+
+			else:
+				node["num"] = name
+
+				for variable in self.domain.findall("variable"):
+					if variable.get("name") == self.names[i]:
+						index = name
+						for group in variable.findall("group"):
+							if index == 0:
+								node["name"] = group.get("name")
+							index -= 1
+
+			record[self.names[i]] = node
+			i += 1
+
+		self.records.append(record)
+
+
+
+
+
+		"""
+				for idx, group in enumerate(domain.get('groups')):
+					if group == value:
+						record[self.attributes[i]] = {'name': group, 'num': idx + 1}
+				"""
